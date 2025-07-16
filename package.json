@@ -40,9 +40,11 @@
     "README.md",
     "LICENSE"
   ],
+  "publishConfig": {
+    "registry": "https://repo.asredanesh.com/repository/npm-hosted/"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/axios-instance-manager.git"
-  },
-  "private": true
+    "url": "https://gitlab.asredanesh.com/bourse/axios-instance-manager.git"
+  }
 }
