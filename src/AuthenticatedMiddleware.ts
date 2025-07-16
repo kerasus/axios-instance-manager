@@ -33,7 +33,7 @@ function isValidToken (tokenMetaData: TokenMetaDataType): boolean {
   }
 }
 
-export default function AuthenticatedMiddleware (to: RouteLocationNormalizedGeneric, tokenMetaData: TokenMetaDataType, loginRoute: RouteLocationAsRelativeGeneric) {
+export default function iddleware (to: RouteLocationNormalizedGeneric, tokenMetaData: TokenMetaDataType, loginRoute: RouteLocationAsRelativeGeneric) {
   if ((!tokenMetaData || !isValidToken(tokenMetaData)) && to.name !== loginRoute.name) {
     // If token is not valid or not found, redirect to login
     return loginRoute

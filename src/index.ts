@@ -1,11 +1,12 @@
-import AxiosInstanceManager from './AxiosInstanceManager'
-import AuthenticatedMiddleware from './AuthenticatedMiddleware'
+import manager from './AxiosInstanceManager'
+import middleware from './AuthenticatedMiddleware'
 import jwtUtils from './jwtUtils'
 
-export {
-    AxiosInstanceManager,
-    AuthenticatedMiddleware,
-    jwtUtils
+const AxiosInstanceManager = {
+    manager,
+    jwtUtils,
+    middleware,
 }
+export default AxiosInstanceManager
 
-export * from './types'
+// export * from './types'

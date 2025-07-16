@@ -610,7 +610,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     }
 }
 
-export default function AxiosInstanceManager (axiosInstanceManagerConfig: AxiosInstanceManagerConfigType) {
+export default function manager (axiosInstanceManagerConfig: AxiosInstanceManagerConfigType) {
     if (!instance) {
         instance = createInstance(axiosInstanceManagerConfig)
     }
