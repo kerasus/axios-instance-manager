@@ -1,62 +1,8 @@
 import { Buffer } from 'buffer'
-
-export type AuthObjectType = {
-  accessToken: string
-  refreshToken: string
-  sessionState: string
-  userId: number
-  expiresIn: number
-  refresh_expires_in: number
-}
-
-export type DecodedJwtObjectType = {
-  header: {
-    alg: string
-    kid: string
-    typ: string
-  }
-  payload: {
-    aud: string[]
-    azp: string
-    email: string
-    email_verified: boolean
-    exp: number
-    family_name: string
-    given_name: string
-    iss: string
-    jti: string
-    name: string
-    preferred_username: string
-    realm_access: {
-      roles: string[]
-    }
-    resource_access: {
-      account: {
-        roles: string[]
-      }
-      'realm-management': {
-        roles: string[]
-      }
-      scope: string
-      session_state: string
-      sid: string
-      sub: string
-      typ: string
-    }
-    scope: string
-    session_state: string
-    sid: string
-    ledgerId: number
-    sub: string
-    typ: string
-  }
-  signature: string
-}
-
-export const tokenType = 'Bearer'
+import type { DecodedJwtObjectType } from './types'
 
 // Function to decode JWT without verification
-export function getDecodeJwt (token: string): DecodedJwtObjectType | null {
+function getDecodeJwt (token: string): DecodedJwtObjectType | null {
   // Helper function to decode base64url
   function base64urlDecode (str: string): string {
     // Replace non-url compatible chars with base64 standard chars
@@ -92,6 +38,8 @@ export function getDecodeJwt (token: string): DecodedJwtObjectType | null {
   }
 }
 
-export default {
+const jwtUtils = {
   getDecodeJwt
 }
+
+export default jwtUtils

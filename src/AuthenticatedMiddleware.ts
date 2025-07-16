@@ -1,4 +1,4 @@
-import type { TokenMetaDataType } from './AxiosInstanceManager'
+import type { TokenMetaDataType } from './types'
 import type { RouteLocationNormalizedGeneric, RouteLocationAsRelativeGeneric } from 'vue-router'
 
 // Helper function to validate the token

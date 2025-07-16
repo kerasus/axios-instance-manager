@@ -1,50 +1,20 @@
 import { ref } from 'vue'
-import type { AxiosError, AxiosInstance, AxiosResponse } from 'axios'
 import axios from 'axios'
-import { getDecodeJwt } from './jwtUtils'
-
-export interface TokenMetaDataType {
-    tokenType: string | null
-    expiresIn: number | null
-    refreshExpiresIn: number | null
-    issuedAt: number | null
-}
-
-interface TokenData extends TokenMetaDataType {
-    serviceName: string | null
-    scopes: string | null
-    accessToken: string | null
-    refreshToken: string | null
-}
-
-interface AxiosInstanceManagerConfigType {
-    mainScopes: string;
-    mainServiceName: string;
-    frontendApiBase: string;
-    tokenDataInLoacalStoragePrefix: string;
-    getMainTokenAddress: string;
-    getRefreshTokenAddress: string;
-    serverMessagesPrefix: string;
-    localStorageKeyPrefix: string;
-    tokenMetaDataKeyInCookie: string;
-    getServiceTokenAddress: (serviceName: string) => string;
-    setUser: (decodedToken: Record<string, any>) => void;
-    goToLoginPage: () => void;
-
-}
+import jwtUtils from './jwtUtils'
+import type {
+    CacheEntry,
+    TokenData,
+    TokenMetaDataType,
+    ResponseErrorDetail,
+    AxiosInstanceManagerConfigType
+} from './types'
+import type {
+    AxiosError,
+    AxiosInstance,
+    AxiosResponse
+} from 'axios'
 
 let instance: ReturnType<typeof createInstance> | null = null
-
-interface CacheEntry {
-    data: any
-    expiry: number
-}
-
-export interface ResponseErrorDetail {
-    loc: string
-    type: string
-    hasError?: boolean
-}
 
 const cache = new Map<string, CacheEntry>()
 const pendingRequests = new Map<string, Promise<AxiosResponse | AxiosError>>()
@@ -357,7 +327,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     async function setAuthenticatedUserData () {
         const token = await getToken(mainServiceName, mainScopes)
         if (token) {
-            const decodedToken = getDecodeJwt(token)
+            const decodedToken = jwtUtils.getDecodeJwt(token)
             if (decodedToken) {
                 axiosInstanceManagerConfig.setUser(decodedToken)
             }
