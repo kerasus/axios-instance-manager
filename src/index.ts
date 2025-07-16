@@ -1,5 +1,11 @@
-export { default as AxiosInstanceManager } from './AxiosInstanceManager'
-export { default as AuthenticatedMiddleware } from './AuthenticatedMiddleware'
-export { default as jwtUtils } from './jwtUtils'
+import AxiosInstanceManager from './AxiosInstanceManager'
+import AuthenticatedMiddleware from './AuthenticatedMiddleware'
+import jwtUtils from './jwtUtils'
+
+export {
+    AxiosInstanceManager,
+    AuthenticatedMiddleware,
+    jwtUtils
+}
 
 export * from './types'
