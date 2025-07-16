@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import axios from 'axios'
-import jwtUtils from './jwtUtils'
+import jwtUtils from './jwtUtils.js'
 import type {
     CacheEntry,
     TokenData,
