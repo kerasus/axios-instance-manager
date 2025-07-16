@@ -3,7 +3,7 @@ import type { AxiosError, AxiosInstance, AxiosResponse } from 'axios'
 import axios from 'axios'
 import { getDecodeJwt } from './jwtUtils'
 
-interface TokenMetaDataType {
+export interface TokenMetaDataType {
     tokenType: string | null
     expiresIn: number | null
     refreshExpiresIn: number | null
