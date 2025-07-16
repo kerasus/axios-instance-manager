@@ -1,17 +1,6 @@
 import type { TokenMetaDataType } from './AxiosInstanceManager'
 import type { RouteLocationNormalizedGeneric, RouteLocationAsRelativeGeneric } from 'vue-router'
 
-const AuthenticatedMiddleware = function (to: RouteLocationNormalizedGeneric, tokenMetaData: TokenMetaDataType, loginRoute: RouteLocationAsRelativeGeneric) {
-  if ((!tokenMetaData || !isValidToken(tokenMetaData)) && to.name !== loginRoute.name) {
-    // If token is not valid or not found, redirect to login
-    return loginRoute
-  }
-
-  // Continue to the route if token is found or already on login page
-  return null
-}
-
-
 // Helper function to validate the token
 function isValidToken (tokenMetaData: TokenMetaDataType): boolean {
   try {
@@ -44,4 +33,12 @@ function isValidToken (tokenMetaData: TokenMetaDataType): boolean {
   }
 }
 
-export default AuthenticatedMiddleware
+export default function AuthenticatedMiddleware (to: RouteLocationNormalizedGeneric, tokenMetaData: TokenMetaDataType, loginRoute: RouteLocationAsRelativeGeneric) {
+  if ((!tokenMetaData || !isValidToken(tokenMetaData)) && to.name !== loginRoute.name) {
+    // If token is not valid or not found, redirect to login
+    return loginRoute
+  }
+
+  // Continue to the route if token is found or already on login page
+  return null
+}
