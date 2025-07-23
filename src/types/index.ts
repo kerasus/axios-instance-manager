@@ -39,7 +39,7 @@ export interface ResponseErrorDetail {
     hasError?: boolean
 }
 
-export type DecodedJwtObjectType = {
+export interface DecodedJwtObjectType {
     header: {
         alg: string
         kid: string
@@ -79,6 +79,7 @@ export type DecodedJwtObjectType = {
         ledgerId: number
         sub: string
         typ: string
+        customerId: string
     }
     signature: string
 }
