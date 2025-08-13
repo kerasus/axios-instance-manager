@@ -23,7 +23,7 @@ export interface AxiosInstanceManagerConfigType {
     localStorageKeyPrefix: string;
     tokenMetaDataKeyInCookie: string;
     getServiceTokenAddress: (serviceName: string) => string;
-    setUser: (decodedToken: Record<string, any>) => void;
+    setUser: (decodedToken: Record<string, any>) => Promise<void>;
     goToLoginPage: () => void;
 
 }

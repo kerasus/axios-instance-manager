@@ -329,7 +329,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         if (token) {
             const decodedToken = jwtUtils.getDecodeJwt(token)
             if (decodedToken) {
-                axiosInstanceManagerConfig.setUser(decodedToken)
+                await axiosInstanceManagerConfig.setUser(decodedToken)
             }
         }
     }
