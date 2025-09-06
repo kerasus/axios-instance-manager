@@ -117,7 +117,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
             }
     }
 
-    function setCredentials (username: string, password: string, captcha: string, otp: string): void {
+    function setCredentials (username: string, password: string, captcha?: string, otp?: string): void {
         credentials.value.username = username
         credentials.value.password = password
         credentials.value.captcha = captcha
