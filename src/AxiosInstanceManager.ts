@@ -60,11 +60,13 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     const credentials = ref<{
         username: string | null
         password: string | null
-        captcha: string | null
+        captcha?: string | null
+        otp?: string | null
     }>({
         username: null,
         password: null,
-        captcha: null
+        captcha: null,
+        otp: null
     })
     let refreshTokenPromise: Promise<void> | null = null
 
@@ -115,10 +117,11 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
             }
     }
 
-    function setCredentials (username: string, password: string, captcha: string): void {
+    function setCredentials (username: string, password: string, captcha: string, otp: string): void {
         credentials.value.username = username
         credentials.value.password = password
         credentials.value.captcha = captcha
+        credentials.value.otp = otp
     }
 
     function getSavedTokenData (serviceName: string, scopes: string): TokenData | null {
@@ -201,15 +204,19 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     }
 
     async function obtainMainToken (): Promise<TokenData> {
-        if (!credentials.value.username || !credentials.value.password || !credentials.value.captcha) {
-            throw new Error('Credentials or captcha are not set')
+        if (
+            !credentials.value.username ||
+            !credentials.value.password
+        ) {
+            throw new Error('Credentials are not set')
         }
 
         try {
             const response = await axios.post(getMainTokenAddress, {
                 username: credentials.value.username,
                 password: credentials.value.password,
-                captcha: credentials.value.captcha
+                captcha: credentials.value.captcha,
+                otp: credentials.value.otp
             })
             const data = {
                 serviceName: mainServiceName,
@@ -569,6 +576,8 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         // Clear credentials
         credentials.value.username = null
         credentials.value.password = null
+        credentials.value.captcha = null
+        credentials.value.otp = null
     }
 
     function deleteAllCookies () {
