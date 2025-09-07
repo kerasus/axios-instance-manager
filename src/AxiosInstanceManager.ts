@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import axios from 'axios'
-import jwtUtils from './jwtUtils.js'
+import jwtUtils from './jwtUtils'
 import type {
     CacheEntry,
     TokenData,
@@ -184,11 +184,15 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         expiresIn: number
         refreshExpiresIn: number
     } | null {
+        if (!document.cookie) {
+            return null
+        }
+
         const name = 'tokenData='
         const decodedCookie = decodeURIComponent(document.cookie)
-        const cookieArr = decodedCookie.split(';')
-
-        for (let i = 0; i < cookieArr.length; i++) {
+        const cookieArr = decodedCookie.split(';').filter(item=>!!item)
+        const cookieArrCount = cookieArr.length
+        for (let i = 0; i < cookieArrCount; i++) {
             const cookie = cookieArr[i].trim()
             if (cookie.indexOf(name) === 0) {
                 const cookieValue = cookie.substring(name.length, cookie.length)
@@ -398,12 +402,16 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         })
     }
 
+    function createRawInstance(baseURL?: string): AxiosInstance {
+        return axios.create({
+            baseURL: baseURL || frontendApiBase // Set baseURL from environment variable
+        })
+    }
+
     function addInstance (serviceName: string, scopes: string): void {
         const instanceKey = getInstanceKey(serviceName, scopes)
         // Create an Axios instance with the baseURL
-        const instance: AxiosInstance = axios.create({
-            baseURL: frontendApiBase // Set baseURL from environment variable
-        })
+        const instance: AxiosInstance = createRawInstance(frontendApiBase)
 
         const tokenData = loadTokenData(serviceName, scopes)
 
@@ -615,6 +623,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         setCredentials,
         obtainMainToken,
         getSavedTokenData,
+        createRawInstance,
         getMainTokenDataFromCookie
     }
 }

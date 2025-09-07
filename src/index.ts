@@ -1,6 +1,6 @@
-import manager from './AxiosInstanceManager.js'
-import middleware from './AuthenticatedMiddleware.js'
-import jwtUtils from './jwtUtils.js'
+import manager from './AxiosInstanceManager'
+import middleware from './AuthenticatedMiddleware'
+import jwtUtils from './jwtUtils'
 
 const AxiosInstanceManager = {
     manager,
@@ -9,4 +9,4 @@ const AxiosInstanceManager = {
 }
 export default AxiosInstanceManager
 
-export * from './types/index.js'
+export * from './types/index'
