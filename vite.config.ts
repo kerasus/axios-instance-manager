@@ -18,12 +18,18 @@ export default defineConfig({
                     axios: 'axios',
                     'vue-router': 'VueRouter',
                 },
+                exports: 'named'
             },
         },
+        sourcemap: true,
     },
     plugins: [
         dts({
             insertTypesEntry: true,
+            rollupTypes: true,
         }),
     ],
+    esbuild: {
+        target: 'esnext',
+    },
 })
