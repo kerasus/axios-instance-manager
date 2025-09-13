@@ -1,5 +1,12 @@
-export { default as manager } from './AxiosInstanceManager'
-export { default as middleware } from './AuthenticatedMiddleware'
-export { default as jwtUtils } from './jwtUtils'
+import manager from './AxiosInstanceManager'
+import middleware from './AuthenticatedMiddleware'
+import jwtUtils from './jwtUtils'
 
-export * from './types'
+const AxiosInstanceManager = {
+    manager,
+    jwtUtils,
+    middleware,
+}
+export default AxiosInstanceManager
+
+export * from './types/index'
