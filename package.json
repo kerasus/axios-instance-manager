@@ -1,6 +1,6 @@
 {
   "name": "@ada/axios-instance-manager",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "A Vue 3 and Axios-based instance manager for handling API tokens and requests",
   "type": "module",
   "main": "dist/index.js",
@@ -9,7 +9,7 @@
   },
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --project tsconfig.json",
     "prepublishOnly": "npm run build",
     "test": "jest",
     "lint": "eslint 'src/**/*.{ts,vue}'",
