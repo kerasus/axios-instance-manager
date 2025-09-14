@@ -1,11 +1,18 @@
 {
   "name": "@ada/axios-instance-manager",
-  "version": "1.4.7",
+  "version": "1.4.11",
   "description": "A Vue 3 and Axios-based instance manager for handling API tokens and requests",
   "type": "module",
-  "main": "dist/index.cjs.js",
+  "main": "dist/index.cjs",
   "module": "dist/index.es.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.es.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
     "build": "vite build",
     "prepublishOnly": "vite build",
