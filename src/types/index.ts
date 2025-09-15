@@ -1,3 +1,5 @@
+import {AxiosError} from "axios";
+
 export interface TokenMetaDataType {
     tokenType: string | null
     expiresIn: number | null
@@ -19,13 +21,12 @@ export interface AxiosInstanceManagerConfigType {
     tokenDataInLoacalStoragePrefix: string;
     getMainTokenAddress: string;
     getRefreshTokenAddress: string;
-    serverMessagesPrefix: string;
     localStorageKeyPrefix: string;
     tokenMetaDataKeyInCookie: string;
     getServiceTokenAddress: (serviceName: string) => string;
     setUser: (decodedToken: Record<string, any>) => Promise<void>;
     goToLoginPage: () => void;
-    handleResponseErrors: (error: any) => Promise<void>;
+    handleResponseErrors: (error: AxiosError<ServiceResponseError>) => Promise<void>;
 }
 
 export interface CacheEntry {
