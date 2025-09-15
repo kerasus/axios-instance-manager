@@ -2,17 +2,16 @@ import { ref } from 'vue'
 import axios from 'axios'
 import jwtUtils from './jwtUtils'
 import type {
-    CacheEntry,
+    AxiosError,
+    AxiosResponse,
+    AxiosInstance
+} from 'axios'
+import type {
     TokenData,
+    CacheEntry,
     TokenMetaDataType,
-    ResponseErrorDetail,
     AxiosInstanceManagerConfigType
 } from './types'
-import type {
-    AxiosError,
-    AxiosInstance,
-    AxiosResponse
-} from 'axios'
 
 let instance: ReturnType<typeof createInstance> | null = null
 
@@ -54,6 +53,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     const getMainTokenAddress = axiosInstanceManagerConfig.getMainTokenAddress
     const getRefreshTokenAddress = axiosInstanceManagerConfig.getRefreshTokenAddress
     const getServiceTokenAddress = axiosInstanceManagerConfig.getServiceTokenAddress
+    const handleResponseErrors = axiosInstanceManagerConfig.handleResponseErrors
 
     const instances = ref<Record<string, AxiosInstance>>({})
     const tokens = ref<Record<string, TokenData | null>>({})
@@ -481,24 +481,8 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
                     }
                 }
 
-                if (error.response) {
-                    const { detail } = error.response.data
-                    if (Array.isArray(detail) && detail.length > 0) {
-                        notifyError(
-                            (detail as ResponseErrorDetail[]).map((item) => {
-                                return {
-                                    loc: item.loc,
-                                    type: `${axiosInstanceManagerConfig.serverMessagesPrefix}.${item.type}`
-                                }
-                            })
-                        )
-                    } else if (Array.isArray(detail) && detail.length === 0) {
-                        notifyError('error.' + error.response.status)
-                    } else {
-                        notifyError('unknownError')
-                    }
-                } else {
-                    notifyError('error.0')
+                if (typeof handleResponseErrors === 'function') {
+                    await handleResponseErrors(error)
                 }
 
                 return Promise.reject(error)
@@ -603,15 +587,6 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
 
     function goToLoginPage () {
         axiosInstanceManagerConfig.goToLoginPage()
-    }
-
-    function notifyError (message: string | ResponseErrorDetail[]) {
-        // Create a new custom event
-        const customEvent = new CustomEvent('axios-interceptors-response-error', {
-            detail: { message }
-        })
-        // Dispatch the event on any DOM element
-        window.dispatchEvent(customEvent)
     }
 
     return {

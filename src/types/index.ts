@@ -25,7 +25,7 @@ export interface AxiosInstanceManagerConfigType {
     getServiceTokenAddress: (serviceName: string) => string;
     setUser: (decodedToken: Record<string, any>) => Promise<void>;
     goToLoginPage: () => void;
-
+    handleResponseErrors: (error: any) => Promise<void>;
 }
 
 export interface CacheEntry {
@@ -36,7 +36,16 @@ export interface CacheEntry {
 export interface ResponseErrorDetail {
     loc: string
     type: string
+    parameters: Record<string, string | number>
     hasError?: boolean
+}
+
+export interface ServiceResponseError {
+    clientError: null | string | number
+    errorCode: null | string | number
+    errorMessage: null | string
+    errorService: null | string
+    detail: ResponseErrorDetail[]
 }
 
 export interface DecodedJwtObjectType {
