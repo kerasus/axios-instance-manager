@@ -49,7 +49,8 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     const mainScopes = axiosInstanceManagerConfig.mainScopes
     const mainServiceName = axiosInstanceManagerConfig.mainServiceName
     const frontendApiBase = axiosInstanceManagerConfig.frontendApiBase
-    const tokenDataInLoacalStoragePrefix = axiosInstanceManagerConfig.tokenDataInLoacalStoragePrefix
+    const tokenMetaDataKeyInCookie = axiosInstanceManagerConfig.tokenMetaDataKeyInCookie
+    const tokenDataInLocalStoragePrefix = axiosInstanceManagerConfig.tokenDataInLocalStoragePrefix
     const getMainTokenAddress = axiosInstanceManagerConfig.getMainTokenAddress
     const getRefreshTokenAddress = axiosInstanceManagerConfig.getRefreshTokenAddress
     const getServiceTokenAddress = axiosInstanceManagerConfig.getServiceTokenAddress
@@ -76,7 +77,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     function getLocalStorageKey (serviceName: string, scopes: string) {
         const instanceKey = getInstanceKey(serviceName, scopes)
 
-        return `${axiosInstanceManagerConfig.localStorageKeyPrefix}_${tokenDataInLoacalStoragePrefix}${instanceKey}`
+        return `${axiosInstanceManagerConfig.localStorageKeyPrefix}_${tokenDataInLocalStoragePrefix}${instanceKey}`
     }
 
     function saveTokenData (serviceName: string, scopes: string, tokenData: TokenData): void {
@@ -176,7 +177,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         // // Optionally, set an expiration date for the cookie
         // const expires = new Date()
         // expires.setTime(expires.getTime() + (tokenData.refreshExpiresIn * 1000)) // assuming refreshExpiresIn is in seconds
-        // document.cookie = `tokenData=${encodeURIComponent(tokenDataString)}; path=/; expires=${expires.toUTCString()}; SameSite=Strict;`
+        // document.cookie = `${tokenMetaDataKeyInCookie}=${encodeURIComponent(tokenDataString)}; path=/; expires=${expires.toUTCString()}; SameSite=Strict;`
     }
 
     function getMainTokenDataFromCookie (): {
@@ -188,7 +189,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
             return null
         }
 
-        const name = 'tokenData='
+        const name = `${tokenMetaDataKeyInCookie}=`
         const decodedCookie = decodeURIComponent(document.cookie)
         const cookieArr = decodedCookie.split(';').filter(item=>!!item)
         const cookieArrCount = cookieArr.length
@@ -560,9 +561,8 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         }
 
         if (typeof window !== 'undefined') {
-            sessionStorage.clear()
-            localStorage.clear()
-            deleteAllCookies()
+            clearLocalStorageKeysWithPrefix(axiosInstanceManagerConfig.localStorageKeyPrefix)
+            deleteTokenMetaDataFromCookie()
         }
 
         // Clear credentials
@@ -572,17 +572,26 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         credentials.value.otp = null
     }
 
-    function deleteAllCookies () {
+    function clearLocalStorageKeysWithPrefix (prefix: string) {
+        const keysToRemove = []
+        const localStorageLength = localStorage.length
+        for (let i = 0; i < localStorageLength; i++) {
+            const key = localStorage.key(i)
+            if (key && key.startsWith(prefix)) {
+                keysToRemove.push(key)
+            }
+        }
+
+        keysToRemove.forEach((key) => {
+            localStorage.removeItem(key)
+        })
+    }
+
+    function deleteTokenMetaDataFromCookie () {
         if (typeof window === 'undefined') {
             return
         }
-        const cookies = document.cookie.split(';')
-
-        for (const cookie of cookies) {
-            const eqPos = cookie.indexOf('=')
-            const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie
-            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
-        }
+        document.cookie = `${tokenMetaDataKeyInCookie}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
     }
 
     function goToLoginPage () {

@@ -18,7 +18,7 @@ export interface AxiosInstanceManagerConfigType {
     mainScopes: string;
     mainServiceName: string;
     frontendApiBase: string;
-    tokenDataInLoacalStoragePrefix: string;
+    tokenDataInLocalStoragePrefix: string;
     getMainTokenAddress: string;
     getRefreshTokenAddress: string;
     localStorageKeyPrefix: string;
