@@ -235,6 +235,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
             }
             const mainInstanceKey = getMainInstanceKey()
             tokens.value[mainInstanceKey] = data
+            clearTokens()
             saveTokenData(mainServiceName, mainScopes, data)
 
             // Save token data to cookie and use that in
