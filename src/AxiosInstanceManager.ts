@@ -252,7 +252,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         } catch (error) {
             console.error('Error obtaining main token:', error)
             // Explicitly reject the promise by throwing an error
-            throw new Error('Failed to obtain main token')
+            throw error
         }
     }
 
