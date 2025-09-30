@@ -223,6 +223,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
                 captcha: credentials.value.captcha,
                 otp: credentials.value.otp
             })
+            clearTokens()
             const data = {
                 serviceName: mainServiceName,
                 scopes: mainScopes,
@@ -235,7 +236,6 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
             }
             const mainInstanceKey = getMainInstanceKey()
             tokens.value[mainInstanceKey] = data
-            clearTokens()
             saveTokenData(mainServiceName, mainScopes, data)
 
             // Save token data to cookie and use that in
@@ -329,12 +329,11 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
                 tokens.value[instanceKey].issuedAt = null
             }
         })
-        saveTokenDataToCookie({
-            tokenType: null,
-            expiresIn: null,
-            refreshExpiresIn: null,
-            issuedAt: null
-        })
+
+        if (typeof window !== 'undefined') {
+            clearLocalStorageKeysWithPrefix(axiosInstanceManagerConfig.localStorageKeyPrefix)
+            deleteTokenMetaDataFromCookie()
+        }
     }
 
     async function setAuthenticatedUserData () {
@@ -557,14 +556,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
 
     function logout (): void {
         // Clear all tokens
-        for (const serviceName in tokens.value) {
-            tokens.value[serviceName] = null
-        }
-
-        if (typeof window !== 'undefined') {
-            clearLocalStorageKeysWithPrefix(axiosInstanceManagerConfig.localStorageKeyPrefix)
-            deleteTokenMetaDataFromCookie()
-        }
+        clearTokens()
 
         // Clear credentials
         credentials.value.username = null
