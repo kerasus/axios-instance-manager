@@ -1,6 +1,6 @@
 {
   "name": "@ada/axios-instance-manager",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "description": "A Vue 3 and Axios-based instance manager for handling API tokens and requests",
   "type": "module",
   "main": "dist/index.cjs",
@@ -29,7 +29,7 @@
   "author": "esmaeili <a.esmaeili@asredanesh.com>",
   "license": "MIT",
   "dependencies": {
-    "axios": "1.11.0",
+    "axios": "1.12.1",
     "buffer": "^6.0.3",
     "vue": "^3.5.17",
     "vue-router": "^4.5.1"
