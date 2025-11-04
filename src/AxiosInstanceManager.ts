@@ -258,10 +258,26 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
 
     async function obtainServiceToken (serviceName: string, scopes: string): Promise<TokenData> {
         try {
-            let mainToken = await getToken(mainServiceName, mainScopes)
-            if (!mainToken) {
-                throw new Error('Main token not available')
+            if (serviceName === mainServiceName) {
+                throw new Error('obtainServiceToken should not be used to obtain the main service token')
             }
+
+            const mainInstanceKey = getMainInstanceKey()
+            let mainTokenData = tokens.value[mainInstanceKey] ?? loadTokenData(mainServiceName, mainScopes)
+
+            if (!mainTokenData || !mainTokenData.accessToken) {
+                mainTokenData = await obtainMainToken()
+            }
+
+            const mainToken = mainTokenData.accessToken
+            if (!mainToken) {
+                throw new Error('Main token is not available after attempting to obtain it')
+            }
+
+            // let mainToken = await getToken(mainServiceName, mainScopes)
+            // if (!mainToken) {
+            //     throw new Error('Main token not available')
+            // }
 
             const instanceForObtainServiceToken = axios.create({
                 baseURL: frontendApiBase // Set baseURL from environment variable
@@ -276,13 +292,14 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
 
                         try {
                             await refreshToken()
-                            mainToken = await getToken(mainServiceName, mainScopes)
-                            if (mainToken) {
-                                originalRequest.data = JSON.stringify(getObtainServiceTokenPayload(mainToken))
+                            const refreshedMain = tokens.value[mainInstanceKey] ?? loadTokenData(mainServiceName, mainScopes)
+                            const refreshedMainAccess = refreshedMain?.accessToken
+                            if (refreshedMainAccess) {
+                                originalRequest.data = JSON.stringify(getObtainServiceTokenPayload(refreshedMainAccess))
                                 return instanceForObtainServiceToken(originalRequest)
                             }
                         } catch (refreshError) {
-                            console.error(`Error refreshing token for "${serviceName}":`, refreshError)
+                            console.error(`Error refreshing token while obtaining service token for "${serviceName}":`, refreshError)
                             return Promise.reject(refreshError)
                         }
                     }
@@ -315,7 +332,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
                 `Error obtaining token for serviceName: "${serviceName}", scopes: "${scopes}":`,
                 error
             )
-            throw new Error(`Failed to obtain serviceName: "${serviceName}", scopes: "${scopes}" token`)
+            throw new Error(`Failed to obtain token for service "${serviceName}", scopes "${scopes}"`)
         }
     }
 
