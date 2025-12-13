@@ -1,4 +1,5 @@
-import {AxiosError} from "axios";
+import { AxiosError } from 'axios'
+import { LogLevel } from '../logger'
 
 export interface TokenMetaDataType {
     tokenType: string | null
@@ -25,8 +26,10 @@ export interface AxiosInstanceManagerConfigType {
     tokenMetaDataKeyInCookie: string;
     getServiceTokenAddress: (serviceName: string) => string;
     setUser: (decodedToken: Record<string, any>) => Promise<void>;
-    goToLoginPage: () => void;
+    afterLogout: () => Promise<void>;
+    beforeLogout: () => Promise<void>;
     handleResponseErrors: (error: AxiosError<ServiceResponseError>) => Promise<void>;
+    logLevel: LogLevel;
 }
 
 export interface CacheEntry {

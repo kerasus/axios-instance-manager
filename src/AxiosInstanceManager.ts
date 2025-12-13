@@ -1,8 +1,8 @@
 import { ref } from 'vue'
 import axios from 'axios'
 import jwtUtils from './jwtUtils'
+import { createLogger } from './logger'
 import type {
-    AxiosError,
     AxiosResponse,
     AxiosInstance
 } from 'axios'
@@ -13,10 +13,35 @@ import type {
     AxiosInstanceManagerConfigType
 } from './types'
 
+export class AuthError extends Error {
+    constructor (message?: string) {
+        super(message ?? 'Authentication error')
+        this.name = 'AuthError'
+    }
+}
+
 let instance: ReturnType<typeof createInstance> | null = null
+let isLoggedOut = false
 
 const cache = new Map<string, CacheEntry>()
-const pendingRequests = new Map<string, Promise<AxiosResponse | AxiosError>>()
+const pendingRequests = new Map<string, { promise: Promise<AxiosResponse>, createdAt: number }>()
+
+const PENDING_REQUEST_TTL = 1000 * 30
+const CACHE_CLEANUP_INTERVAL = 1000 * 60 * 5
+
+setInterval(() => {
+    const now = Date.now()
+    for (const [url, entry] of cache.entries()) {
+        if (entry.expiry <= now) {
+            cache.delete(url)
+        }
+    }
+    for (const [url, req] of pendingRequests.entries()) {
+        if (now - req.createdAt > PENDING_REQUEST_TTL) {
+            pendingRequests.delete(url)
+        }
+    }
+}, CACHE_CLEANUP_INTERVAL)
 
 function getCachedData (url: string): AxiosResponse | null {
     const cacheEntry = cache.get(url)
@@ -56,8 +81,10 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     const getServiceTokenAddress = axiosInstanceManagerConfig.getServiceTokenAddress
     const handleResponseErrors = axiosInstanceManagerConfig.handleResponseErrors
 
-    const instances = ref<Record<string, AxiosInstance>>({})
-    const tokens = ref<Record<string, TokenData | null>>({})
+    const logger = createLogger(axiosInstanceManagerConfig.logLevel || 'error')
+
+    const instances = new Map<string, AxiosInstance>()
+    const tokens = new Map<string, TokenData | null>()
     const credentials = ref<{
         username: string | null
         password: string | null
@@ -72,7 +99,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     let refreshTokenPromise: Promise<void> | null = null
 
     const mainInstanceKey = getMainInstanceKey()
-    tokens.value[mainInstanceKey] = loadTokenData(mainServiceName, mainScopes)
+    tokens.set(mainInstanceKey, getTokenDataFromLocalStorage(mainServiceName, mainScopes))
 
     function getLocalStorageKey (serviceName: string, scopes: string) {
         const instanceKey = getInstanceKey(serviceName, scopes)
@@ -81,12 +108,12 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     }
 
     function saveTokenData (serviceName: string, scopes: string, tokenData: TokenData): void {
-        const mainInstanceKey = getMainInstanceKey()
-        const instanceKey = getInstanceKey(serviceName, scopes)
-        const localStorageKey = getLocalStorageKey(serviceName, scopes)
         if (typeof window === 'undefined') {
             return
         }
+        const mainInstanceKey = getMainInstanceKey()
+        const instanceKey = getInstanceKey(serviceName, scopes)
+        const localStorageKey = getLocalStorageKey(serviceName, scopes)
         localStorage.setItem(localStorageKey, JSON.stringify(tokenData))
         if (mainInstanceKey === instanceKey) {
             saveTokenDataToCookie({
@@ -98,24 +125,22 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         }
     }
 
-    function loadTokenData (serviceName: string, scopes: string): TokenData | null {
-        const localStorageKey = getLocalStorageKey(serviceName, scopes)
+    function getTokenDataFromLocalStorage (serviceName: string, scopes: string): TokenData | null {
         if (typeof window === 'undefined') {
             return null
         }
+        const localStorageKey = getLocalStorageKey(serviceName, scopes)
         const data = localStorage.getItem(localStorageKey)
-        return data
-            ? JSON.parse(data)
-            : {
-                serviceName: null,
-                scopes: null,
-                tokenType: null,
-                accessToken: null,
-                refreshToken: null,
-                issuedAt: null,
-                expiresIn: null,
-                refreshExpiresIn: null
-            }
+        if (!data) {
+            return null
+        }
+
+        try {
+            return JSON.parse(data)
+        } catch (err) {
+            logger.error(`Failed to parse token data from localStorage for key "${localStorageKey}":`, err)
+            return null
+        }
     }
 
     function setCredentials (username: string, password: string, captcha?: string, otp?: string): void {
@@ -123,52 +148,48 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         credentials.value.password = password
         credentials.value.captcha = captcha
         credentials.value.otp = otp
+
+        isLoggedOut = false
     }
 
     function getSavedTokenData (serviceName: string, scopes: string): TokenData | null {
         const instanceKey = getInstanceKey(serviceName, scopes)
-        tokens.value[instanceKey] = loadTokenData(serviceName, scopes)
-        return tokens.value[instanceKey]
+        const loaded = getTokenDataFromLocalStorage(serviceName, scopes)
+        if (loaded) {
+            tokens.set(instanceKey, loaded)
+        }
+        return tokens.get(instanceKey) ?? null
     }
 
     async function getToken (serviceName: string, scopes: string): Promise<string | null | undefined> {
-        const mainInstanceKey = getMainInstanceKey()
         const instanceKey = getInstanceKey(serviceName, scopes)
         let tokenData = getSavedTokenData(serviceName, scopes)
 
-        if (!tokenData?.accessToken && instanceKey === mainInstanceKey) {
-            goToLoginPage()
+        if (!tokenData?.accessToken && instanceKey === getMainInstanceKey()) {
             throw new Error('Failed to obtain main token')
         }
 
         try {
             if (!tokenData?.accessToken) {
+                if (serviceName === mainServiceName && scopes === mainScopes) {
+                    throw new Error('Cannot obtain main service token via obtainServiceToken')
+                }
                 tokenData = await obtainServiceToken(serviceName, scopes)
-                tokens.value[instanceKey] = tokenData
+                tokens.set(instanceKey, tokenData)
                 saveTokenData(serviceName, scopes, tokenData)
                 return tokenData.accessToken
             }
             return tokenData.accessToken
         } catch (error) {
-            goToLoginPage()
-            if (error instanceof Error) {
-                console.error(
-                    `Error getting token for serviceName: "${serviceName}", scopes: "${scopes}":`,
-                    error
-                )
-                throw new Error(
-                    `Failed to get token for serviceName: "${serviceName}, scopes: "${scopes}": ${error.message}`
-                )
-            } else {
-                console.error('Unexpected error type:', error)
-                throw new Error(
-                    `Failed to get token for serviceName: "${serviceName}, scopes: "${scopes}"": Unexpected error`
-                )
-            }
+            logger.error(`Error getting token for serviceName: "${serviceName}", scopes: "${scopes}":`, error)
+            throw error instanceof Error ? error : new Error('Unexpected error getting token')
         }
     }
 
     function saveTokenDataToCookie (tokenMetaData: TokenMetaDataType) {
+        if (typeof window === 'undefined') {
+            return
+        }
         const tokenMetaDataString = JSON.stringify(tokenMetaData)
 
         // Set the cookie with the token data
@@ -185,19 +206,26 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         expiresIn: number
         refreshExpiresIn: number
     } | null {
+        if (typeof window === 'undefined') {
+            return null
+        }
         if (!document.cookie) {
             return null
         }
 
         const name = `${tokenMetaDataKeyInCookie}=`
         const decodedCookie = decodeURIComponent(document.cookie)
-        const cookieArr = decodedCookie.split(';').filter(item=>!!item)
+        const cookieArr = decodedCookie.split(';').filter((item)=>!!item)
         const cookieArrCount = cookieArr.length
         for (let i = 0; i < cookieArrCount; i++) {
             const cookie = cookieArr[i].trim()
             if (cookie.indexOf(name) === 0) {
                 const cookieValue = cookie.substring(name.length, cookie.length)
-                return JSON.parse(cookieValue)
+                try {
+                    return JSON.parse(cookieValue)
+                } catch {
+                    return null
+                }
             }
         }
 
@@ -209,6 +237,11 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     }
 
     async function obtainMainToken (): Promise<TokenData> {
+        if (isLoggedOut) {
+            logger.warn('obtainMainToken aborted: user logged out')
+            return Promise.reject(new Error('User logged out'))
+        }
+
         if (
             !credentials.value.username ||
             !credentials.value.password
@@ -235,7 +268,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
                 issuedAt: Date.now()
             }
             const mainInstanceKey = getMainInstanceKey()
-            tokens.value[mainInstanceKey] = data
+            tokens.set(mainInstanceKey, data)
             saveTokenData(mainServiceName, mainScopes, data)
 
             // Save token data to cookie and use that in
@@ -250,7 +283,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
 
             return data
         } catch (error) {
-            console.error('Error obtaining main token:', error)
+            logger.error('Error obtaining main token:', error)
             // Explicitly reject the promise by throwing an error
             throw error
         }
@@ -258,12 +291,12 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
 
     async function obtainServiceToken (serviceName: string, scopes: string): Promise<TokenData> {
         try {
-            if (serviceName === mainServiceName) {
+            if (serviceName === mainServiceName && scopes === mainScopes) {
                 throw new Error('obtainServiceToken should not be used to obtain the main service token')
             }
 
             const mainInstanceKey = getMainInstanceKey()
-            let mainTokenData = tokens.value[mainInstanceKey] ?? loadTokenData(mainServiceName, mainScopes)
+            let mainTokenData = tokens.get(mainInstanceKey) ?? getTokenDataFromLocalStorage(mainServiceName, mainScopes)
 
             if (!mainTokenData || !mainTokenData.accessToken) {
                 mainTokenData = await obtainMainToken()
@@ -292,14 +325,14 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
 
                         try {
                             await refreshToken()
-                            const refreshedMain = tokens.value[mainInstanceKey] ?? loadTokenData(mainServiceName, mainScopes)
+                            const refreshedMain = tokens.get(mainInstanceKey) ?? getTokenDataFromLocalStorage(mainServiceName, mainScopes)
                             const refreshedMainAccess = refreshedMain?.accessToken
                             if (refreshedMainAccess) {
                                 originalRequest.data = JSON.stringify(getObtainServiceTokenPayload(refreshedMainAccess))
                                 return instanceForObtainServiceToken(originalRequest)
                             }
                         } catch (refreshError) {
-                            console.error(`Error refreshing token while obtaining service token for "${serviceName}":`, refreshError)
+                            logger.error(`Error refreshing token while obtaining service token for "${serviceName}":`, refreshError)
                             return Promise.reject(refreshError)
                         }
                     }
@@ -328,7 +361,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
             saveTokenData(serviceName, scopes, tokenData)
             return tokenData
         } catch (error) {
-            console.error(
+            logger.error(
                 `Error obtaining token for serviceName: "${serviceName}", scopes: "${scopes}":`,
                 error
             )
@@ -337,15 +370,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     }
 
     function clearTokens (): void {
-        Object.keys(tokens.value).forEach((instanceKey) => {
-            if (tokens.value[instanceKey]) {
-                tokens.value[instanceKey].accessToken = null
-                tokens.value[instanceKey].expiresIn = null
-                tokens.value[instanceKey].refreshToken = null
-                tokens.value[instanceKey].refreshExpiresIn = null
-                tokens.value[instanceKey].issuedAt = null
-            }
-        })
+        tokens.clear()
 
         if (typeof window !== 'undefined') {
             clearLocalStorageKeysWithPrefix(axiosInstanceManagerConfig.localStorageKeyPrefix)
@@ -354,6 +379,10 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     }
 
     async function setAuthenticatedUserData () {
+        if (typeof axiosInstanceManagerConfig.setUser !== 'function') {
+            return
+        }
+
         const token = await getToken(mainServiceName, mainScopes)
         if (token) {
             const decodedToken = jwtUtils.getDecodeJwt(token)
@@ -364,27 +393,39 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     }
 
     async function refreshToken (): Promise<void> {
+        if (isLoggedOut) {
+            logger.warn('Refresh aborted: user logged out')
+            return
+        }
+
         if (refreshTokenPromise) {
             return refreshTokenPromise
         }
 
         refreshTokenPromise = (async () => {
             try {
+                if (isLoggedOut) {
+                    return
+                }
                 const mainInstanceKey = getMainInstanceKey()
-                const mainTokenData = tokens.value[mainInstanceKey]
+                const mainTokenData = tokens.get(mainInstanceKey)
 
                 if (!mainTokenData || !mainTokenData.refreshToken) {
-                    throw new Error(`No refresh token available for MainService: "${mainServiceName}"`)
+                    throw new AuthError(`No refresh token available for MainService: "${mainServiceName}"`)
                 }
 
-                // Send POST request to the refresh-token endpoint and refresh main token
                 const response = await axios.put(getRefreshTokenAddress, {
-                    refreshToken: mainTokenData.refreshToken // Use refreshToken as the key
+                    refreshToken: mainTokenData.refreshToken
                 })
+
+                if (isLoggedOut) {
+                    return // avoid overwriting after logout
+                }
+
                 clearTokens()
 
                 // Update main token with the new access token and refresh token
-                tokens.value[mainInstanceKey] = {
+                tokens.set(mainInstanceKey, {
                     serviceName: mainServiceName,
                     scopes: mainScopes,
                     accessToken: response.data.accessToken,
@@ -393,13 +434,16 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
                     expiresIn: response.data.expiresIn,
                     refreshExpiresIn: response.data.refreshExpiresIn,
                     issuedAt: Date.now()
-                }
+                })
 
                 // Save the new tokens in local storage
                 saveAllTokensData()
                 await setAuthenticatedUserData()
             } catch (error) {
-                console.error('Error refreshing token', error)
+                logger.error('Error refreshing token', error)
+                if (error instanceof AuthError) {
+                    throw error
+                }
                 throw new Error('Error refreshing token: Unexpected error')
             } finally {
                 refreshTokenPromise = null
@@ -410,17 +454,19 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
     }
 
     function saveAllTokensData () {
-        Object.keys(tokens.value).forEach((instanceKey) => {
-            const tokenItem = tokens.value[instanceKey]
-            const serviceName = tokenItem?.serviceName
-            const scopes = tokenItem?.scopes
-            if (serviceName && scopes && tokens.value[instanceKey]) {
-                saveTokenData(serviceName, scopes, tokens.value[instanceKey])
+        for (const [instanceKey, tokenItem] of tokens.entries()) {
+            if (!tokenItem) {
+                continue
             }
-        })
+
+            const { serviceName, scopes } = tokenItem
+            if (serviceName && scopes) {
+                saveTokenData(serviceName, scopes, tokenItem)
+            }
+        }
     }
 
-    function createRawInstance(baseURL?: string): AxiosInstance {
+    function createRawInstance (baseURL?: string): AxiosInstance {
         return axios.create({
             baseURL: baseURL || frontendApiBase // Set baseURL from environment variable
         })
@@ -431,7 +477,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         // Create an Axios instance with the baseURL
         const instance: AxiosInstance = createRawInstance(frontendApiBase)
 
-        const tokenData = loadTokenData(serviceName, scopes)
+        const tokenData = getTokenDataFromLocalStorage(serviceName, scopes)
 
         instance.interceptors.request.use(
             async (config) => {
@@ -445,11 +491,11 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
                             try {
                                 await refreshToken()
                             } catch (refreshError) {
-                                console.error(
+                                logger.error(
                                     `Error refreshing token for serviceName: "${serviceName}", scopes: "${scopes}":`,
                                     refreshError
                                 )
-                                goToLoginPage()
+                                await logout()
                             }
                         }
                     }
@@ -460,7 +506,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
 
                     return config
                 } catch (error) {
-                    console.error(
+                    logger.error(
                         `Error setting Authorization header for serviceName: "${serviceName}", scopes: "${scopes}":`,
                         error
                     )
@@ -474,7 +520,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
             },
             (error) => {
                 // Handle request errors
-                console.error(`Request error for "${serviceName}":`, error)
+                logger.error(`Request error for "${serviceName}":`, error)
                 return Promise.reject(error)
             }
         )
@@ -491,11 +537,11 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
                         await refreshToken()
                         return instance(originalRequest)
                     } catch (refreshError) {
-                        console.error(
+                        logger.error(
                             `Error refreshing token for serviceName: "${serviceName}", scopes: "${scopes}":`,
                             refreshError
                         )
-                        goToLoginPage()
+                        await logout()
                     }
                 }
 
@@ -517,14 +563,17 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
                 }
 
                 // 2. Check if there's an ongoing request for the same URL
-                if (pendingRequests.has(url)) {
-                    return pendingRequests.get(url) as Promise<AxiosResponse<any>>
+                const now = Date.now()
+                const pending = pendingRequests.get(url)
+                if (pending && now - pending.createdAt <= PENDING_REQUEST_TTL) {
+                    return pending.promise
                 }
 
                 // 3. Create the request promise and cache it
                 const requestPromise = instance
                     .get(url, config)
                     .then((response) => {
+                        // @ts-ignore
                         const ttl = config.cache?.ttl || 1000 * 60 * 5 // Default TTL: 5 minutes
                         cacheData(url, response, ttl) // Cache the response
                         pendingRequests.delete(url) // Remove from pendingRequests once done
@@ -532,14 +581,17 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
                     })
                     .catch((error) => {
                         pendingRequests.delete(url) // Remove from pendingRequests on error
+                        if (error.response?.status === 401) {
+                            cache.delete(url) // Invalidate cache if unauthorized
+                        }
                         return Promise.reject(error)
                     })
 
-                pendingRequests.set(url, requestPromise) // Store the promise in the map
+                pendingRequests.set(url, { promise: requestPromise, createdAt: now }) // Store the promise in the map
 
                 return requestPromise // Return the ongoing request promise
             } catch (error) {
-                console.error(`Error fetching with cache for URL "${url}":`, error)
+                logger.error(`Error fetching with cache for URL "${url}":`, error)
                 return Promise.reject(error)
             }
         }
@@ -549,12 +601,12 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
             instance.defaults.headers.common.Authorization = `Bearer ${tokenData.accessToken}`
         }
 
-        instances.value[instanceKey] = instance
+        instances.set(instanceKey, instance)
     }
 
     function getInstance (serviceName: string, scopes: string): AxiosInstance {
         const instanceKey = getInstanceKey(serviceName, scopes)
-        const instance = instances.value[instanceKey]
+        const instance = instances.get(instanceKey)
         if (!instance) {
             throw new Error(
                 `Axios instance serviceName: "${serviceName}", scopes: "${scopes}" not found.`
@@ -571,8 +623,18 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         return serviceName + '-' + scopes
     }
 
-    function logout (): void {
-        // Clear all tokens
+    async function logout (): Promise<void> {
+        isLoggedOut = true
+        refreshTokenPromise = null
+
+        if (typeof axiosInstanceManagerConfig.beforeLogout === 'function') {
+            try {
+                await axiosInstanceManagerConfig.beforeLogout()
+            } catch (error) {
+                logger.error('Error in beforeLogout callback:', error)
+            }
+        }
+
         clearTokens()
 
         // Clear credentials
@@ -580,9 +642,23 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         credentials.value.password = null
         credentials.value.captcha = null
         credentials.value.otp = null
+
+        cache.clear()
+        pendingRequests.clear()
+
+        if (typeof axiosInstanceManagerConfig.afterLogout === 'function') {
+            try {
+                await axiosInstanceManagerConfig.afterLogout()
+            } catch (error) {
+                logger.error('Error in afterLogout callback:', error)
+            }
+        }
     }
 
     function clearLocalStorageKeysWithPrefix (prefix: string) {
+        if (typeof window === 'undefined') {
+            return
+        }
         const keysToRemove = []
         const localStorageLength = localStorage.length
         for (let i = 0; i < localStorageLength; i++) {
@@ -601,11 +677,7 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         if (typeof window === 'undefined') {
             return
         }
-        document.cookie = `${tokenMetaDataKeyInCookie}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-    }
-
-    function goToLoginPage () {
-        axiosInstanceManagerConfig.goToLoginPage()
+        document.cookie = `${tokenMetaDataKeyInCookie}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
     }
 
     return {
@@ -613,12 +685,12 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         getToken,
         addInstance,
         getInstance,
-        loadTokenData,
         setCredentials,
         obtainMainToken,
         getSavedTokenData,
         createRawInstance,
-        getMainTokenDataFromCookie
+        getMainTokenDataFromCookie,
+        getTokenDataFromLocalStorage
     }
 }
 
