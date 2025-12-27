@@ -3,8 +3,8 @@ import type {
   AxiosInstance as OriginalAxiosInstance,
   AxiosResponse as OriginalAxiosResponse,
   AxiosRequestConfig as OriginalAxiosRequestConfig,
-  AxiosResponse
-} from 'axios'
+  AxiosResponse,
+} from 'axios';
 
 export type ApiErrorDetailItemType = {
   loc: string | null

@@ -1,14 +1,14 @@
-import type { TokenMetaDataType } from './types'
-import type { RouteLocationNormalizedGeneric, RouteLocationAsRelativeGeneric } from 'vue-router'
+import type { TokenMetaDataType } from './types';
+import type { RouteLocationNormalizedGeneric, RouteLocationAsRelativeGeneric } from 'vue-router';
 
 // Helper function to validate the token
 function isValidToken (tokenMetaData: TokenMetaDataType): boolean {
   try {
-    const { issuedAt, refreshExpiresIn } = tokenMetaData
+    const { issuedAt, refreshExpiresIn } = tokenMetaData;
 
     // Check if the token has an expiration field and if it has expired
     if (
-        issuedAt === null ||
+      issuedAt === null ||
         refreshExpiresIn === null ||
         isNaN(issuedAt) ||
         isNaN(refreshExpiresIn) ||
@@ -16,29 +16,33 @@ function isValidToken (tokenMetaData: TokenMetaDataType): boolean {
         refreshExpiresIn < 0
     ) {
       // Token does not have a valid structure
-      return false
+      return false;
     }
 
     // Token is valid
     // Assuming refreshExpiresIn is the number of seconds from the time the token was issued
     const refreshTokenExpiresAt =
       new Date(issuedAt).getTime() +
-        refreshExpiresIn * 1000
+        refreshExpiresIn * 1000;
     return (
       tokenMetaData.refreshExpiresIn === 0 || Date.now() <= refreshTokenExpiresAt
-    )
+    );
   } catch (error) {
-    console.error('Invalid token format:', error)
-    return false
+    console.error('Invalid token format:', error);
+    return false;
   }
 }
 
-export default function middleware (to: RouteLocationNormalizedGeneric, tokenMetaData: TokenMetaDataType, loginRoute: RouteLocationAsRelativeGeneric) {
+export default function middleware (
+  to: RouteLocationNormalizedGeneric,
+  tokenMetaData: TokenMetaDataType,
+  loginRoute: RouteLocationAsRelativeGeneric,
+): RouteLocationAsRelativeGeneric | null | undefined {
   if ((!tokenMetaData || !isValidToken(tokenMetaData)) && to.name !== loginRoute.name) {
-    // If token is not valid or not found, redirect to login
-    return loginRoute
+    // If a token is not valid or not found, redirect to log in
+    return loginRoute;
   }
 
-  // Continue to the route if token is found or already on login page
-  return null
+  // Continue to the route if a token is found or already on the login page
+  return null;
 }

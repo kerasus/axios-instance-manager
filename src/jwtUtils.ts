@@ -1,45 +1,44 @@
-import { Buffer } from 'buffer'
-import type { DecodedJwtObjectType } from './types'
+import { Buffer } from 'buffer';
+import type { DecodedJwtObjectType } from './types';
 
 // Function to decode JWT without verification
 function getDecodeJwt (token: string): DecodedJwtObjectType | null {
   // Helper function to decode base64url
   function base64urlDecode (str: string): string {
     // Replace non-url compatible chars with base64 standard chars
-    str = str.replace(/-/g, '+').replace(/_/g, '/')
+    str = str.replace(/-/g, '+').replace(/_/g, '/');
 
     // Pad with trailing '=' to make length of the string a multiple of 4
     while (str.length % 4) {
-      str += '='
+      str += '=';
     }
 
     // Decode base64 string
-    const decodedStr = Buffer.from(str, 'base64').toString('utf8')
-    return decodedStr
+    return Buffer.from(str, 'base64').toString('utf8');
   }
   try {
-    const [header, payload, signature] = token.split('.')
+    const [header, payload, signature] = token.split('.');
 
     if (!header || !payload || !signature) {
-      throw new Error('Invalid token format')
+      throw new Error('Invalid token format');
     }
 
-    const decodedHeader = JSON.parse(base64urlDecode(header))
-    const decodedPayload = JSON.parse(base64urlDecode(payload))
+    const decodedHeader = JSON.parse(base64urlDecode(header)) as DecodedJwtObjectType['header'];
+    const decodedPayload = JSON.parse(base64urlDecode(payload)) as DecodedJwtObjectType['payload'];
 
     return {
       header: decodedHeader,
       payload: decodedPayload,
-      signature
-    }
+      signature,
+    };
   } catch (error) {
-    console.error('Failed to decode token:', error)
-    return null
+    console.error('Failed to decode token:', error);
+    return null;
   }
 }
 
 const jwtUtils = {
-  getDecodeJwt
-}
+  getDecodeJwt,
+};
 
-export default jwtUtils
+export default jwtUtils;

@@ -1,11 +1,12 @@
-import { AxiosError } from 'axios'
-import { LogLevel } from '../logger'
+import type { AxiosError } from 'axios';
+import type { LogLevel } from '../logger';
 
 export interface TokenMetaDataType {
     tokenType: string | null
     expiresIn: number | null
     refreshExpiresIn: number | null
     issuedAt: number | null
+    otpExpiresIn?: number | null
 }
 
 export interface TokenData extends TokenMetaDataType {
@@ -33,7 +34,7 @@ export interface AxiosInstanceManagerConfigType {
 }
 
 export interface CacheEntry {
-    data: any
+    data: unknown
     expiry: number
 }
 
