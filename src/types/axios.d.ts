@@ -4,7 +4,7 @@ import type {
   AxiosResponse as OriginalAxiosResponse,
   AxiosRequestConfig as OriginalAxiosRequestConfig,
   AxiosResponse,
-} from 'axios';
+} from 'axios'
 
 export type ApiErrorDetailItemType = {
   loc: string | null

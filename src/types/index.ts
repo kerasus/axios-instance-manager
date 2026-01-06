@@ -1,12 +1,14 @@
-import type { AxiosError } from 'axios';
-import type { LogLevel } from '../logger';
+import type { AxiosError } from 'axios'
+import type { LogLevel } from '../logger'
 
 export interface TokenMetaDataType {
     tokenType: string | null
-    expiresIn: number | null
-    refreshExpiresIn: number | null
+    expiresIn: number | null // in second
+    refreshExpiresIn: number | null // in second
+    otpExpiresIn?: number | null // in second
     issuedAt: number | null
-    otpExpiresIn?: number | null
+    mfaEnabled?: boolean
+    mfaVerified?: boolean
 }
 
 export interface TokenData extends TokenMetaDataType {
@@ -19,14 +21,18 @@ export interface TokenData extends TokenMetaDataType {
 export interface AxiosInstanceManagerConfigType {
     mainScopes: string;
     mainServiceName: string;
+    logoutScopes: string;
+    logoutServiceName: string;
     frontendApiBase: string;
     tokenDataInLocalStoragePrefix: string;
     getMainTokenAddress: string;
+    logoutAddress: string;
     getRefreshTokenAddress: string;
+    verifyMainTokenMfaAddress: string;
     localStorageKeyPrefix: string;
     tokenMetaDataKeyInCookie: string;
     getServiceTokenAddress: (serviceName: string) => string;
-    setUser: (decodedToken: Record<string, any>) => Promise<void>;
+    setUser?: (tokenData: TokenData, decodedToken: Record<string, any>) => Promise<void>;
     afterLogout: () => Promise<void>;
     beforeLogout: () => Promise<void>;
     handleResponseErrors: (error: AxiosError<ServiceResponseError>) => Promise<void>;
