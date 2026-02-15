@@ -347,7 +347,8 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
       !credentials.value.username ||
             !credentials.value.password
     ) {
-      throw new Error('Credentials are not set')
+      await logout()
+      throw new AuthError('Credentials are not set')
     }
 
     try {
@@ -756,11 +757,21 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         await axiosInstanceManagerConfig.beforeLogout()
       } catch (error) {
         logger.error('Error in beforeLogout callback:', error)
-        throw error
       }
     }
 
-    const logoutServiceToken = await getToken(logoutServiceName, logoutScopes)
+    let logoutServiceToken = null
+    try {
+      logoutServiceToken = await getToken(logoutServiceName, logoutScopes)
+    } catch (error) {
+      logger.error('Error getting logout token:', error)
+    }
+
+    clearTokens()
+    clearCredentials()
+    cache.clear()
+    pendingRequests.clear()
+
     if (logoutServiceToken) {
       try {
         const instanceForLogout = axios.create({
@@ -771,29 +782,25 @@ function createInstance (axiosInstanceManagerConfig: AxiosInstanceManagerConfigT
         await instanceForLogout.delete(logoutAddress)
       } catch (error) {
         logger.error('Error during logout:', error)
-        throw error
+        throw new AuthError('Error during logout')
       }
     }
-
-    clearTokens()
-
-    // Clear credentials
-    credentials.value.username = null
-    credentials.value.password = null
-    credentials.value.captcha = null
-    credentials.value.otp = null
-
-    cache.clear()
-    pendingRequests.clear()
 
     if (typeof axiosInstanceManagerConfig.afterLogout === 'function') {
       try {
         await axiosInstanceManagerConfig.afterLogout()
       } catch (error) {
         logger.error('Error in afterLogout callback:', error)
-        throw error
+        throw new AuthError('Error in afterLogout callback')
       }
     }
+  }
+
+  function clearCredentials () {
+    credentials.value.username = null
+    credentials.value.password = null
+    credentials.value.captcha = null
+    credentials.value.otp = null
   }
 
   function clearLocalStorageKeysWithPrefix (prefix: string): void {
